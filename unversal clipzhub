@@ -33,6 +33,7 @@ local function loadConfig()
         espShowDistance = true,
         espShowHealth = true,
         autoLoadOnTeleport = true,
+        invisibilityEnabled = false,
     }
     if not HAS_FILE_IO then return defaults end
     local ok, data = pcall(function()
@@ -66,6 +67,7 @@ local function saveConfig()
         espShowDistance = espShowDistance,
         espShowHealth = espShowHealth,
         autoLoadOnTeleport = autoLoadOnTeleport,
+        invisibilityEnabled = invisibilityEnabled,
     }
     pcall(function()
         writefile(CONFIG_FILE, game:GetService("HttpService"):JSONEncode(data))
@@ -107,8 +109,50 @@ local espFolder = nil
 local autoLoadOnTeleport = cfg.autoLoadOnTeleport ~= false
 local lastPosition = nil
 
-local function markDirty()
-    task.spawn(saveConfig)
+-- ===== INVISIBILITY =====
+local invisibilityEnabled = cfg.invisibilityEnabled or false
+local invisibilityTransparency = 1
+local savedTransparencies = {}
+
+local function setInvisibility(state)
+    invisibilityEnabled = state
+    if not character or not character.Parent then return end
+    
+    if state then
+        -- Save original transparencies and make invisible
+        savedTransparencies = {}
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                savedTransparencies[part] = part.LocalTransparencyModifier
+                part.LocalTransparencyModifier = invisibilityTransparency
+                part.Transparency = invisibilityTransparency
+            elseif part:IsA("Decal") then
+                savedTransparencies[part] = part.Transparency
+                part.Transparency = invisibilityTransparency
+            elseif part:IsA("Accessory") then
+                for _, handle in ipairs(part:GetDescendants()) do
+                    if handle:IsA("BasePart") then
+                        savedTransparencies[handle] = handle.LocalTransparencyModifier
+                        handle.LocalTransparencyModifier = invisibilityTransparency
+                        handle.Transparency = invisibilityTransparency
+                    end
+                end
+            end
+        end
+    else
+        -- Restore original transparencies
+        for part, transparency in pairs(savedTransparencies) do
+            if part and part.Parent then
+                if part:IsA("BasePart") then
+                    part.LocalTransparencyModifier = transparency
+                    part.Transparency = transparency
+                elseif part:IsA("Decal") then
+                    part.Transparency = transparency
+                end
+            end
+        end
+        savedTransparencies = {}
+    end
 end
 
 -- ===== GUI =====
@@ -352,16 +396,17 @@ mainScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
 mainScrollLayout.Parent = mainScroll
 
 local mainInner = Instance.new("Frame")
-mainInner.Size = UDim2.new(1, -12, 0, 380)
+mainInner.Size = UDim2.new(1, -12, 0, 460)
 mainInner.BackgroundTransparency = 1
 mainInner.Parent = mainScroll
 
 local flyButton, flyStroke = createToggleButton("FLY", 0, mainInner)
 local noclipButton, noclipStroke = createToggleButton("NOCLIP", 55, mainInner)
+local invisButton, invisStroke = createToggleButton("INVISIBILITY", 110, mainInner)
 
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(1, 0, 0, 20)
-speedLabel.Position = UDim2.new(0, 0, 0, 110)
+speedLabel.Position = UDim2.new(0, 0, 0, 165)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Text = "Fly Speed: " .. FLY_SPEED
 speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -372,7 +417,7 @@ speedLabel.Parent = mainInner
 
 local sliderBg = Instance.new("Frame")
 sliderBg.Size = UDim2.new(1, 0, 0, 10)
-sliderBg.Position = UDim2.new(0, 0, 0, 133)
+sliderBg.Position = UDim2.new(0, 0, 0, 188)
 sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 sliderBg.BorderSizePixel = 0
 sliderBg.Parent = mainInner
@@ -405,11 +450,11 @@ local shc = Instance.new("UICorner")
 shc.CornerRadius = UDim.new(1, 0)
 shc.Parent = sliderHandle
 
-local walkToggleButton, walkToggleStroke = createToggleButton("WALKSPEED", 155, mainInner)
+local walkToggleButton, walkToggleStroke = createToggleButton("WALKSPEED", 210, mainInner)
 
 local walkLabel = Instance.new("TextLabel")
 walkLabel.Size = UDim2.new(1, 0, 0, 20)
-walkLabel.Position = UDim2.new(0, 0, 0, 210)
+walkLabel.Position = UDim2.new(0, 0, 0, 265)
 walkLabel.BackgroundTransparency = 1
 walkLabel.Text = "Walk Speed: " .. WALK_SPEED
 walkLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -420,7 +465,7 @@ walkLabel.Parent = mainInner
 
 local walkSliderBg = Instance.new("Frame")
 walkSliderBg.Size = UDim2.new(1, 0, 0, 10)
-walkSliderBg.Position = UDim2.new(0, 0, 0, 233)
+walkSliderBg.Position = UDim2.new(0, 0, 0, 288)
 walkSliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 walkSliderBg.BorderSizePixel = 0
 walkSliderBg.Parent = mainInner
@@ -453,11 +498,11 @@ local wshc = Instance.new("UICorner")
 wshc.CornerRadius = UDim.new(1, 0)
 wshc.Parent = walkSliderHandle
 
-local jumpToggleButton, jumpToggleStroke = createToggleButton("JUMP POWER", 255, mainInner)
+local jumpToggleButton, jumpToggleStroke = createToggleButton("JUMP POWER", 310, mainInner)
 
 local jumpLabel = Instance.new("TextLabel")
 jumpLabel.Size = UDim2.new(1, 0, 0, 20)
-jumpLabel.Position = UDim2.new(0, 0, 0, 310)
+jumpLabel.Position = UDim2.new(0, 0, 0, 365)
 jumpLabel.BackgroundTransparency = 1
 jumpLabel.Text = "Jump Power: " .. JUMP_POWER
 jumpLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -468,7 +513,7 @@ jumpLabel.Parent = mainInner
 
 local jumpSliderBg = Instance.new("Frame")
 jumpSliderBg.Size = UDim2.new(1, 0, 0, 10)
-jumpSliderBg.Position = UDim2.new(0, 0, 0, 333)
+jumpSliderBg.Position = UDim2.new(0, 0, 0, 388)
 jumpSliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 jumpSliderBg.BorderSizePixel = 0
 jumpSliderBg.Parent = mainInner
@@ -503,7 +548,7 @@ jshc.Parent = jumpSliderHandle
 
 local infoLabel = Instance.new("TextLabel")
 infoLabel.Size = UDim2.new(1, 0, 0, 40)
-infoLabel.Position = UDim2.new(0, 0, 0, 355)
+infoLabel.Position = UDim2.new(0, 0, 0, 410)
 infoLabel.BackgroundTransparency = 1
 infoLabel.Text = "Right Ctrl = Toggle Menu\nWASD = Fly Move"
 infoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -945,6 +990,14 @@ espHealthButton.Text = "SHOW HEALTH: " .. (espShowHealth and "ON" or "OFF")
 updateToggleVisual(autoTPButton, autoTPStroke, autoLoadOnTeleport)
 autoTPButton.Text = "RELOAD ON TELEPORT: " .. (autoLoadOnTeleport and "ON" or "OFF")
 
+-- Apply invisibility if it was enabled
+if invisibilityEnabled then
+    updateToggleVisual(invisButton, invisStroke, true)
+    invisButton.Text = "INVISIBILITY: ON"
+    task.wait(0.5)
+    setInvisibility(true)
+end
+
 -- ===== NOCLIP =====
 local function setNoclip(state)
     noclip = state
@@ -995,6 +1048,12 @@ end
 
 flyButton.MouseButton1Click:Connect(function() setFly(not flying) end)
 noclipButton.MouseButton1Click:Connect(function() setNoclip(not noclip) end)
+invisButton.MouseButton1Click:Connect(function()
+    setInvisibility(not invisibilityEnabled)
+    updateToggleVisual(invisButton, invisStroke, invisibilityEnabled)
+    invisButton.Text = "INVISIBILITY: " .. (invisibilityEnabled and "ON" or "OFF")
+    markDirty()
+end)
 
 -- ===== WALKSPEED =====
 local function applyWalkSpeed()
@@ -1529,6 +1588,10 @@ RunService.Heartbeat:Connect(function()
                     end
                 end
             end
+            if invisibilityEnabled then
+                task.wait(0.5)
+                setInvisibility(true)
+            end
         end
     end
     lastPosition = currentPos
@@ -1594,6 +1657,7 @@ player.CharacterAdded:Connect(function(newChar)
     humanoid = newChar:WaitForChild("Humanoid")
     rootPart = newChar:WaitForChild("HumanoidRootPart")
     lastPosition = rootPart.Position
+    savedTransparencies = {}
     if noclip then
         task.wait(0.5)
         setNoclip(true)
@@ -1605,6 +1669,10 @@ player.CharacterAdded:Connect(function(newChar)
     if jumpPowerEnabled then
         task.wait(0.5)
         applyJumpPower()
+    end
+    if invisibilityEnabled then
+        task.wait(0.5)
+        setInvisibility(true)
     end
 end)
 
