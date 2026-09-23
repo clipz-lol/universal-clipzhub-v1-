@@ -34,6 +34,10 @@ local function loadConfig()
         espShowHealth = true,
         autoLoadOnTeleport = true,
         invisibilityEnabled = false,
+        slot1Name = "Slot 1",
+        slot1Pos = nil,
+        slot2Name = "Slot 2",
+        slot2Pos = nil,
     }
     if not HAS_FILE_IO then return defaults end
     local ok, data = pcall(function()
@@ -68,6 +72,10 @@ local function saveConfig()
         espShowHealth = espShowHealth,
         autoLoadOnTeleport = autoLoadOnTeleport,
         invisibilityEnabled = invisibilityEnabled,
+        slot1Name = slot1Name,
+        slot1Pos = slot1Pos,
+        slot2Name = slot2Name,
+        slot2Pos = slot2Pos,
     }
     pcall(function()
         writefile(CONFIG_FILE, game:GetService("HttpService"):JSONEncode(data))
@@ -119,7 +127,6 @@ local function setInvisibility(state)
     if not character or not character.Parent then return end
     
     if state then
-        -- Save original transparencies and make invisible
         savedTransparencies = {}
         for _, part in ipairs(character:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -140,7 +147,6 @@ local function setInvisibility(state)
             end
         end
     else
-        -- Restore original transparencies
         for part, transparency in pairs(savedTransparencies) do
             if part and part.Parent then
                 if part:IsA("BasePart") then
@@ -154,6 +160,12 @@ local function setInvisibility(state)
         savedTransparencies = {}
     end
 end
+
+-- ===== TELEPORT SLOTS =====
+local slot1Name = cfg.slot1Name or "Slot 1"
+local slot1Pos = cfg.slot1Pos
+local slot2Name = cfg.slot2Name or "Slot 2"
+local slot2Pos = cfg.slot2Pos
 
 -- ===== GUI =====
 local screenGui = Instance.new("ScreenGui")
@@ -559,15 +571,27 @@ infoLabel.TextXAlignment = Enum.TextXAlignment.Left
 infoLabel.TextYAlignment = Enum.TextYAlignment.Top
 infoLabel.Parent = mainInner
 
--- ===== TELEPORT TAB =====
+-- ===== TELEPORT TAB (Player list only) =====
 local tpContent = Instance.new("Frame")
 tpContent.Size = UDim2.new(1, 0, 1, 0)
 tpContent.BackgroundTransparency = 1
 tpContent.Visible = false
 tpContent.Parent = contentFrame
 
+local playerListLabel = Instance.new("TextLabel")
+playerListLabel.Size = UDim2.new(1, 0, 0, 20)
+playerListLabel.Position = UDim2.new(0, 0, 0, 0)
+playerListLabel.BackgroundTransparency = 1
+playerListLabel.Text = "PLAYERS"
+playerListLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+playerListLabel.TextSize = 12
+playerListLabel.Font = Enum.Font.GothamBold
+playerListLabel.TextXAlignment = Enum.TextXAlignment.Left
+playerListLabel.Parent = tpContent
+
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, 0, 1, 0)
+scrollFrame.Size = UDim2.new(1, 0, 1, -26)
+scrollFrame.Position = UDim2.new(0, 0, 0, 26)
 scrollFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 scrollFrame.BorderSizePixel = 0
 scrollFrame.ScrollBarThickness = 6
@@ -675,7 +699,7 @@ local function createPlayerRow(targetPlayer, layoutOrder)
 
     local tpc = Instance.new("UICorner")
     tpc.CornerRadius = UDim.new(0, 5)
-    tpc.Parent = tpBtn
+    tpc.Parent = tpc
 
     row.MouseButton1Click:Connect(function() teleportTo(targetPlayer) end)
     tpBtn.MouseButton1Click:Connect(function() teleportTo(targetPlayer) end)
@@ -824,18 +848,213 @@ local espNameButton, espNameStroke = createSmallToggle("SHOW NAME", 86, espConte
 local espDistButton, espDistStroke = createSmallToggle("SHOW DISTANCE", 129, espContent)
 local espHealthButton, espHealthStroke = createSmallToggle("SHOW HEALTH", 172, espContent)
 
--- ===== CONFIG TAB =====
+-- ===== CONFIG TAB (with slots) =====
 local cfgContent = Instance.new("Frame")
 cfgContent.Size = UDim2.new(1, 0, 1, 0)
 cfgContent.BackgroundTransparency = 1
 cfgContent.Visible = false
 cfgContent.Parent = contentFrame
 
-local autoTPButton, autoTPStroke = createSmallToggle("RELOAD ON TELEPORT", 0, cfgContent)
+local cfgScroll = Instance.new("ScrollingFrame")
+cfgScroll.Size = UDim2.new(1, 0, 1, 0)
+cfgScroll.BackgroundTransparency = 1
+cfgScroll.BorderSizePixel = 0
+cfgScroll.ScrollBarThickness = 4
+cfgScroll.ScrollBarImageColor3 = Color3.fromRGB(200, 0, 0)
+cfgScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+cfgScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+cfgScroll.ScrollingEnabled = true
+cfgScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+cfgScroll.ElasticBehavior = Enum.ElasticBehavior.Never
+cfgScroll.Active = true
+cfgScroll.Parent = cfgContent
 
+local cfgScrollLayout = Instance.new("UIListLayout")
+cfgScrollLayout.Padding = UDim.new(0, 8)
+cfgScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+cfgScrollLayout.Parent = cfgScroll
+
+local cfgInner = Instance.new("Frame")
+cfgInner.Size = UDim2.new(1, -12, 0, 460)
+cfgInner.BackgroundTransparency = 1
+cfgInner.Parent = cfgScroll
+
+-- Auto-reload toggle
+local autoTPButton, autoTPStroke = createSmallToggle("RELOAD ON TELEPORT", 0, cfgInner)
+
+-- Slots title
+local slotsTitle = Instance.new("TextLabel")
+slotsTitle.Size = UDim2.new(1, 0, 0, 20)
+slotsTitle.Position = UDim2.new(0, 0, 0, 46)
+slotsTitle.BackgroundTransparency = 1
+slotsTitle.Text = "SAVED SLOTS"
+slotsTitle.TextColor3 = Color3.fromRGB(255, 80, 80)
+slotsTitle.TextSize = 12
+slotsTitle.Font = Enum.Font.GothamBold
+slotsTitle.TextXAlignment = Enum.TextXAlignment.Left
+slotsTitle.Parent = cfgInner
+
+-- Slot builder
+local function buildSlot(parent, yPos, getSlotNum)
+    local slotFrame = Instance.new("Frame")
+    slotFrame.Size = UDim2.new(1, 0, 0, 70)
+    slotFrame.Position = UDim2.new(0, 0, 0, yPos)
+    slotFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    slotFrame.BorderSizePixel = 0
+    slotFrame.Parent = parent
+
+    local sc = Instance.new("UICorner")
+    sc.CornerRadius = UDim.new(0, 6)
+    sc.Parent = slotFrame
+
+    local ss = Instance.new("UIStroke")
+    ss.Color = Color3.fromRGB(80, 0, 0)
+    ss.Thickness = 1.5
+    ss.Parent = slotFrame
+
+    local nameBox = Instance.new("TextBox")
+    nameBox.Size = UDim2.new(1, -100, 0, 24)
+    nameBox.Position = UDim2.new(0, 6, 0, 6)
+    nameBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    nameBox.Text = (getSlotNum() == 1) and slot1Name or slot2Name
+    nameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameBox.TextSize = 12
+    nameBox.Font = Enum.Font.GothamBold
+    nameBox.BorderSizePixel = 0
+    nameBox.ClearTextOnFocus = false
+    nameBox.PlaceholderText = "Slot Name"
+    nameBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
+    nameBox.Parent = slotFrame
+
+    local nbc = Instance.new("UICorner")
+    nbc.CornerRadius = UDim.new(0, 4)
+    nbc.Parent = nameBox
+
+    local nbs = Instance.new("UIStroke")
+    nbs.Color = Color3.fromRGB(80, 0, 0)
+    nbs.Thickness = 1
+    nbs.Parent = nameBox
+
+    local statusLbl = Instance.new("TextLabel")
+    statusLbl.Size = UDim2.new(1, -100, 0, 14)
+    statusLbl.Position = UDim2.new(0, 8, 0, 34)
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.Text = "Empty"
+    statusLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
+    statusLbl.TextSize = 10
+    statusLbl.Font = Enum.Font.Gotham
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+    statusLbl.Parent = slotFrame
+
+    local btnHolder = Instance.new("Frame")
+    btnHolder.Size = UDim2.new(0, 90, 0, 60)
+    btnHolder.Position = UDim2.new(1, -96, 0, 5)
+    btnHolder.BackgroundTransparency = 1
+    btnHolder.Parent = slotFrame
+
+    local function makeBtn(text, xPos, yPos, color)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0, 42, 0, 26)
+        b.Position = UDim2.new(0, xPos, 0, yPos)
+        b.BackgroundColor3 = color or Color3.fromRGB(120, 0, 0)
+        b.Text = text
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.TextSize = 10
+        b.Font = Enum.Font.GothamBold
+        b.BorderSizePixel = 0
+        b.AutoButtonColor = false
+        b.Parent = btnHolder
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 4)
+        c.Parent = b
+        return b
+    end
+
+    local saveBtn = makeBtn("SAVE", 0, 0, Color3.fromRGB(120, 0, 0))
+    local loadBtn = makeBtn("LOAD", 48, 0, Color3.fromRGB(0, 100, 0))
+    local clearBtn = makeBtn("CLEAR", 24, 30, Color3.fromRGB(60, 0, 0))
+
+    local function refreshUI()
+        local n = getSlotNum()
+        local nm = (n == 1) and slot1Name or slot2Name
+        local pos = (n == 1) and slot1Pos or slot2Pos
+        nameBox.Text = nm
+        if pos then
+            statusLbl.Text = string.format("Saved: %.1f, %.1f, %.1f", pos.x, pos.y, pos.z)
+            statusLbl.TextColor3 = Color3.fromRGB(0, 220, 0)
+        else
+            statusLbl.Text = "Empty"
+            statusLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
+        end
+    end
+
+    nameBox.FocusLost:Connect(function()
+        local n = getSlotNum()
+        local newName = nameBox.Text
+        if newName == "" then newName = "Slot " .. n end
+        if n == 1 then slot1Name = newName else slot2Name = newName end
+        nameBox.Text = newName
+        saveConfig()
+    end)
+
+    saveBtn.MouseButton1Click:Connect(function()
+        local n = getSlotNum()
+        if not rootPart or not rootPart.Parent then
+            showNotification("Cannot save - no character")
+            return
+        end
+        local p = rootPart.Position
+        local posData = {x = p.X, y = p.Y, z = p.Z}
+        if n == 1 then
+            slot1Pos = posData
+            slot1Name = nameBox.Text ~= "" and nameBox.Text or "Slot 1"
+        else
+            slot2Pos = posData
+            slot2Name = nameBox.Text ~= "" and nameBox.Text or "Slot 2"
+        end
+        saveConfig()
+        refreshUI()
+        showNotification("Saved to " .. ((n == 1) and slot1Name or slot2Name))
+    end)
+
+    loadBtn.MouseButton1Click:Connect(function()
+        local n = getSlotNum()
+        local pos = (n == 1) and slot1Pos or slot2Pos
+        if not pos then
+            showNotification("Slot is empty")
+            return
+        end
+        if not rootPart or not rootPart.Parent then
+            showNotification("Cannot teleport - no character")
+            return
+        end
+        rootPart.CFrame = CFrame.new(pos.x, pos.y, pos.z)
+        showNotification("Teleported to " .. ((n == 1) and slot1Name or slot2Name))
+    end)
+
+    clearBtn.MouseButton1Click:Connect(function()
+        local n = getSlotNum()
+        if n == 1 then
+            slot1Pos = nil
+        else
+            slot2Pos = nil
+        end
+        saveConfig()
+        refreshUI()
+        showNotification("Slot cleared")
+    end)
+
+    refreshUI()
+    return slotFrame, refreshUI
+end
+
+local slot1Frame, refreshSlot1 = buildSlot(cfgInner, 72, function() return 1 end)
+local slot2Frame, refreshSlot2 = buildSlot(cfgInner, 148, function() return 2 end)
+
+-- Save Settings button
 local saveButton = Instance.new("TextButton")
 saveButton.Size = UDim2.new(1, 0, 0, 40)
-saveButton.Position = UDim2.new(0, 0, 0, 50)
+saveButton.Position = UDim2.new(0, 0, 0, 230)
 saveButton.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
 saveButton.Text = "SAVE SETTINGS"
 saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -843,7 +1062,7 @@ saveButton.TextSize = 14
 saveButton.Font = Enum.Font.GothamBold
 saveButton.BorderSizePixel = 0
 saveButton.AutoButtonColor = false
-saveButton.Parent = cfgContent
+saveButton.Parent = cfgInner
 
 local svc = Instance.new("UICorner")
 svc.CornerRadius = UDim.new(0, 8)
@@ -851,16 +1070,16 @@ svc.Parent = saveButton
 
 local cfgInfo = Instance.new("TextLabel")
 cfgInfo.Size = UDim2.new(1, 0, 0, 80)
-cfgInfo.Position = UDim2.new(0, 0, 0, 100)
+cfgInfo.Position = UDim2.new(0, 0, 0, 280)
 cfgInfo.BackgroundTransparency = 1
-cfgInfo.Text = HAS_FILE_IO and "Settings auto-save to file\nReload on teleport reapplies features" or "File IO not supported by executor\nSettings won't persist"
+cfgInfo.Text = HAS_FILE_IO and "Settings and slots auto-save to file" or "File IO not supported by executor\nSettings won't persist"
 cfgInfo.TextColor3 = Color3.fromRGB(150, 150, 150)
 cfgInfo.TextSize = 11
 cfgInfo.Font = Enum.Font.Gotham
 cfgInfo.TextWrapped = true
 cfgInfo.TextXAlignment = Enum.TextXAlignment.Left
 cfgInfo.TextYAlignment = Enum.TextYAlignment.Top
-cfgInfo.Parent = cfgContent
+cfgInfo.Parent = cfgInner
 
 -- ===== TAB SWITCHING =====
 local function setActiveTab(tab)
@@ -888,7 +1107,13 @@ local function setActiveTab(tab)
             t.stroke.Color = Color3.fromRGB(80, 0, 0)
         end
     end
-    if tab == "teleport" then refreshPlayerList() end
+    if tab == "teleport" then
+        refreshPlayerList()
+    end
+    if tab == "config" then
+        refreshSlot1()
+        refreshSlot2()
+    end
 end
 
 mainTabButton.MouseButton1Click:Connect(function() setActiveTab("main") end)
@@ -990,7 +1215,6 @@ espHealthButton.Text = "SHOW HEALTH: " .. (espShowHealth and "ON" or "OFF")
 updateToggleVisual(autoTPButton, autoTPStroke, autoLoadOnTeleport)
 autoTPButton.Text = "RELOAD ON TELEPORT: " .. (autoLoadOnTeleport and "ON" or "OFF")
 
--- Apply invisibility if it was enabled
 if invisibilityEnabled then
     updateToggleVisual(invisButton, invisStroke, true)
     invisButton.Text = "INVISIBILITY: ON"
@@ -1052,7 +1276,7 @@ invisButton.MouseButton1Click:Connect(function()
     setInvisibility(not invisibilityEnabled)
     updateToggleVisual(invisButton, invisStroke, invisibilityEnabled)
     invisButton.Text = "INVISIBILITY: " .. (invisibilityEnabled and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 
 -- ===== WALKSPEED =====
@@ -1110,7 +1334,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if draggingWalk then markDirty() end
+        if draggingWalk then saveConfig() end
         draggingWalk = false
     end
 end)
@@ -1178,7 +1402,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if draggingJump then markDirty() end
+        if draggingJump then saveConfig() end
         draggingJump = false
     end
 end)
@@ -1212,7 +1436,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if draggingSlider then markDirty() end
+        if draggingSlider then saveConfig() end
         draggingSlider = false
     end
 end)
@@ -1222,19 +1446,19 @@ aimToggleButton.MouseButton1Click:Connect(function()
     aimbotEnabled = not aimbotEnabled
     updateToggleVisual(aimToggleButton, aimToggleStroke, aimbotEnabled)
     aimToggleButton.Text = "AIMBOT: " .. (aimbotEnabled and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 aimTeamButton.MouseButton1Click:Connect(function()
     aimbotTeamCheck = not aimbotTeamCheck
     updateToggleVisual(aimTeamButton, aimTeamStroke, aimbotTeamCheck)
     aimTeamButton.Text = "TEAM CHECK: " .. (aimbotTeamCheck and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 aimWallButton.MouseButton1Click:Connect(function()
     aimbotWallCheck = not aimbotWallCheck
     updateToggleVisual(aimWallButton, aimWallStroke, aimbotWallCheck)
     aimWallButton.Text = "WALL CHECK: " .. (aimbotWallCheck and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 
 local draggingFov = false
@@ -1265,7 +1489,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if draggingFov then markDirty() end
+        if draggingFov then saveConfig() end
         draggingFov = false
     end
 end)
@@ -1282,31 +1506,31 @@ espToggleButton.MouseButton1Click:Connect(function()
     espEnabled = not espEnabled
     updateToggleVisual(espToggleButton, espToggleStroke, espEnabled)
     espToggleButton.Text = "ESP: " .. (espEnabled and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 espTeamButton.MouseButton1Click:Connect(function()
     espTeamCheck = not espTeamCheck
     updateToggleVisual(espTeamButton, espTeamStroke, espTeamCheck)
     espTeamButton.Text = "TEAM CHECK: " .. (espTeamCheck and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 espNameButton.MouseButton1Click:Connect(function()
     espShowName = not espShowName
     updateToggleVisual(espNameButton, espNameStroke, espShowName)
     espNameButton.Text = "SHOW NAME: " .. (espShowName and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 espDistButton.MouseButton1Click:Connect(function()
     espShowDistance = not espShowDistance
     updateToggleVisual(espDistButton, espDistStroke, espShowDistance)
     espDistButton.Text = "SHOW DISTANCE: " .. (espShowDistance and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 espHealthButton.MouseButton1Click:Connect(function()
     espShowHealth = not espShowHealth
     updateToggleVisual(espHealthButton, espHealthStroke, espShowHealth)
     espHealthButton.Text = "SHOW HEALTH: " .. (espShowHealth and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 
 -- ===== CONFIG BUTTONS =====
@@ -1314,7 +1538,7 @@ autoTPButton.MouseButton1Click:Connect(function()
     autoLoadOnTeleport = not autoLoadOnTeleport
     updateToggleVisual(autoTPButton, autoTPStroke, autoLoadOnTeleport)
     autoTPButton.Text = "RELOAD ON TELEPORT: " .. (autoLoadOnTeleport and "ON" or "OFF")
-    markDirty()
+    saveConfig()
 end)
 saveButton.MouseButton1Click:Connect(function()
     saveConfig()
